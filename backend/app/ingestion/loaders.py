@@ -69,7 +69,7 @@ def load_document(path: Path) -> list[ExtractedPage]:
                 )
 
             for page_number, page in enumerate(reader.pages, start=1):
-                text = page.extracted_text() or ""
+                text = page.extract_text() or ""
 
                 pages.append(
                     ExtractedPage(

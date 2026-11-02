@@ -21,6 +21,39 @@ def test_clean_text_preserves_meaningful_content():
     assert "CSE, ECE" in cleaned
     assert "\n\n\n" not in cleaned
 
+def test_chunking_preserves_word_boundaries():
+    text = (
+        "Computer vision models are useful for "
+        "object detection and image classification. "
+        * 20
+    )
+
+    page = ExtractedPage(
+        source_filename="test.txt",
+        document_id="test-document",
+        document_version="test-version",
+        page_number=1,
+        text=text,
+    )
+
+    chunks = chunk_page(
+        page,
+        chunk_size=100,
+        overlap=20,
+    )
+
+    assert len(chunks) > 1
+
+    # Every subsequent chunk should begin after whitespace, rather than in the middle of a word.
+
+    for chunk in chunks[1:]:
+        assert text[chunk.start_char - 1].isspace()
+
+    # Check that the configured chunk size is respected.
+    for chunk in chunks:
+        assert len(chunk.text) <= 100
+
+
 def test_chunking_preserves_page_metadata():
     page = ExtractedPage(
         source_filename="policy.txt",
@@ -80,3 +113,4 @@ def test_pipeline_ingests_txt_file(tmp_path):
     assert "Minimum CGPA: 7.5" in combined_text
     assert "CSE and ECE" in combined_text
     assert all(chunk.document_version for chunk in chunks)
+

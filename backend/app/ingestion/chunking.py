@@ -5,6 +5,60 @@ from backend.app.ingestion.schemas import (
     ExtractedPage,
 )
 
+def _find_chunk_end(
+        text: str,
+        start: int,
+        target_end: int,
+) -> int:
+    """
+    Find a whitespace boundary near the target chunk end.
+
+    """
+
+    if target_end >= len(text):
+        return len(text)
+
+    search_start = start + (target_end - start) // 2
+
+    space_boundary = text.rfind(" ", search_start, target_end)
+    newline_boundary = text.rfind("\n", search_start, target_end)
+
+    boundary = max(space_boundary, newline_boundary)
+
+    return boundary if boundary > start else target_end
+
+def _find_next_chunk_start(
+        text: str,
+        current_start: int,
+        chunk_end: int,
+        overlap: int,
+        search_radius: int = 50,
+) -> int:
+    """
+    Find a word boundary near the desired overlapping start.
+
+    """
+
+    desired_start = max(current_start + 1, chunk_end - overlap)
+
+    if desired_start >= len(text):
+        return desired_start
+
+    lower = max(current_start + 1, desired_start - search_radius)
+    upper = max(chunk_end - 1, desired_start + search_radius)
+
+    candidates = [
+        position + 1
+        for position in range(lower, upper)
+        if text[position].isspace()
+    ]
+
+    if candidates:
+        return min(candidates, key=lambda position: abs(position - desired_start))
+
+    # Fallback for unusally long sequences without whitespace.
+    return desired_start
+
 def chunk_page(
         page: ExtractedPage, 
         chunk_size: int = 1000,
@@ -36,18 +90,12 @@ def chunk_page(
 
     while start < len(text):
         target_end = min(start + chunk_size, len(text))
-        end = target_end
 
-        # Prefer ending at a word boundary when reasonably close.
-        if target_end < len(text):
-            boundary = text.rfind(
-                " ",
-                start + chunk_size //
-                target_end,
-            )
-
-            if boundary > start:
-                end = boundary
+        end = _find_chunk_end(
+            text=text,
+            start=start,
+            target_end=target_end,
+        )
 
         raw_chunk = text[start:end]
 
@@ -93,7 +141,12 @@ def chunk_page(
             break
 
         # Move forward while retaining context from the previous chunk.
-        start = max(start + 1, end - overlap)
+        start = _find_next_chunk_start(
+            text=text,
+            current_start=start,
+            chunk_end=end,
+            overlap=overlap,
+        )
 
     return chunks
         

@@ -30,7 +30,16 @@ def ingest_document(path: Path) -> list[DocumentChunk]:
         )
 
         if cleaned_page.text:
-            chunks.extend(chunk_page(cleaned_page))
+            new_chunks = chunk_page(cleaned_page)
+            chunks.extend(new_chunks)
+
+        for chunk in new_chunks:
+            for term in ["Minimum", "Understanding"]:
+                position = chunk.text.find(term)
+
+                if position != -1:
+                    print(f"\n--- {term} IN CHUNK ---")
+                    print(repr(chunk.text[position:position + 100]))
 
     if not chunks:
         raise ValueError(f"Document '{path}' produced no usable text chunks.")
